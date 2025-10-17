@@ -1,4 +1,4 @@
-// ============================================
+
 // TASK 0: INITIAL DATA AND SETUP
 // ============================================
 
@@ -13,6 +13,9 @@ let quotes = [
 
 // Variable to store last selected category filter
 let lastSelectedCategory = 'all';
+
+// Server URL for syncing (using JSONPlaceholder as mock API)
+const SERVER_URL = 'https://jsonplaceholder.typicode.com/posts';
 
 
 // ============================================
@@ -45,7 +48,7 @@ function initializeApp() {
   document.getElementById('importFile').addEventListener('change', importFromJsonFile);
   
   // TASK 3: Start periodic server sync (every 30 seconds)
-  setInterval(syncQuotes, 30000);
+  startPeriodicSync();
   
   // TASK 3: Initial sync on load
   syncQuotes();
@@ -150,6 +153,9 @@ function addQuote() {
   
   // Show notification
   showNotification('Quote added successfully!');
+  
+  // TASK 3: Post new quote to server
+  postQuoteToServer(newQuote);
   
   // Display the new quote if it matches current filter
   const currentFilter = document.getElementById('categoryFilter').value;
@@ -294,40 +300,138 @@ function importFromJsonFile(event) {
 // ============================================
 
 /**
- * Sync quotes with server (using JSONPlaceholder as mock API)
+ * Fetch quotes from server using mock API
+ * This function retrieves data from the server
+ */
+async function fetchQuotesFromServer() {
+  try {
+    const response = await fetch(SERVER_URL);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch from server');
+    }
+    
+    const serverData = await response.json();
+    
+    // Transform server data to quote format
+    // Using posts from JSONPlaceholder and converting them to quotes
+    const serverQuotes = serverData.slice(0, 5).map(post => ({
+      text: post.title,
+      category: "Server",
+      id: post.id
+    }));
+    
+    return serverQuotes;
+  } catch (error) {
+    console.error('Error fetching from server:', error);
+    showNotification('Failed to fetch data from server');
+    return [];
+  }
+}
+
+/**
+ * Post a quote to the server using mock API
+ * This function sends data to the server
+ */
+async function postQuoteToServer(quote) {
+  try {
+    const response = await fetch(SERVER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(quote)
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to post to server');
+    }
+    
+    const data = await response.json();
+    console.log('Quote posted to server:', data);
+    
+    // In a real application, you might want to update the quote with server-assigned ID
+    return data;
+  } catch (error) {
+    console.error('Error posting to server:', error);
+    showNotification('Failed to post quote to server');
+    return null;
+  }
+}
+
+/**
+ * Sync quotes with server
+ * This function handles the main synchronization logic
+ * Includes conflict resolution where server data takes precedence
  */
 async function syncQuotes() {
   try {
-    // Fetch data from mock server
-    const response = await fetch('https://jsonplaceholder.typicode.com/posts');
-    const serverData = await response.json();
+    // Notify user that sync is starting
+    showSyncStatus('Syncing with server...', 'info');
     
-    // Transform server data to quote format (simulation)
-    // In a real app, the server would return actual quotes
-    const serverQuotes = serverData.slice(0, 3).map(post => ({
-      text: post.title,
-      category: "Server"
-    }));
+    // Fetch quotes from server
+    const serverQuotes = await fetchQuotesFromServer();
     
-    // TASK 3: Check for new quotes from server and add them
-    let newQuotesAdded = false;
+    if (serverQuotes.length === 0) {
+      showSyncStatus('No new data from server', 'info');
+      return;
+    }
+    
+    // Conflict resolution: Check for new quotes from server
+    let conflictsResolved = 0;
+    let newQuotesAdded = 0;
+    
     serverQuotes.forEach(serverQuote => {
-      // Check if quote already exists
-      const exists = quotes.some(q => q.text === serverQuote.text);
-      if (!exists) {
+      // Check if quote already exists (by text or id)
+      const existingQuoteIndex = quotes.findIndex(q => 
+        q.text === serverQuote.text || (q.id && q.id === serverQuote.id)
+      );
+      
+      if (existingQuoteIndex === -1) {
+        // New quote from server - add it
         quotes.push(serverQuote);
-        newQuotesAdded = true;
+        newQuotesAdded++;
+      } else {
+        // Quote exists - server data takes precedence (conflict resolution)
+        const existingQuote = quotes[existingQuoteIndex];
+        if (existingQuote.text !== serverQuote.text || 
+            existingQuote.category !== serverQuote.category) {
+          // Update with server data (server wins in conflict)
+          quotes[existingQuoteIndex] = serverQuote;
+          conflictsResolved++;
+        }
       }
     });
     
-    // TASK 3: If new quotes were added, save and update UI
-    if (newQuotesAdded) {
+    // Update local storage with merged data
+    if (newQuotesAdded > 0 || conflictsResolved > 0) {
       saveQuotes();
       populateCategories();
-      showSyncStatus('New quotes synced from server!', 'success');
+      
+      // Notify user about updates
+      let message = '';
+      if (newQuotesAdded > 0) {
+        message += `${newQuotesAdded} new quote(s) synced from server. `;
+      }
+      if (conflictsResolved > 0) {
+        message += `${conflictsResolved} conflict(s) resolved (server data applied).`;
+      }
+      
+      showSyncStatus(message, 'success');
+      
+      // Show notification for conflicts
+      if (conflictsResolved > 0) {
+        showNotification(`Conflicts resolved: Server data has been applied to ${conflictsResolved} quote(s)`);
+      }
     } else {
       showSyncStatus('Data is up to date', 'info');
     }
+    
+    console.log('Sync completed:', {
+      newQuotesAdded,
+      conflictsResolved,
+      totalQuotes: quotes.length
+    });
     
   } catch (error) {
     console.error('Sync failed:', error);
@@ -336,18 +440,31 @@ async function syncQuotes() {
 }
 
 /**
- * Show sync status message
+ * Start periodic syncing with server
+ * Checks for updates every 30 seconds
+ */
+function startPeriodicSync() {
+  // Sync every 30 seconds
+  setInterval(() => {
+    syncQuotes();
+  }, 30000);
+  
+  console.log('Periodic sync started (every 30 seconds)');
+}
+
+/**
+ * Show sync status message to user
  */
 function showSyncStatus(message, type) {
   const syncStatus = document.getElementById('syncStatus');
   syncStatus.textContent = message;
   syncStatus.className = `sync-status sync-${type}`;
   
-  // Hide after 3 seconds
+  // Hide after 5 seconds
   setTimeout(() => {
     syncStatus.textContent = '';
     syncStatus.className = '';
-  }, 3000);
+  }, 5000);
 }
 
 
