@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynamic Quote Generator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>📝 Dynamic Quote Generator</h1>
+    
+    <!-- Sync status display -->
+    <div id="syncStatus"></div>
+    
+    <!-- Quote display area -->
+    <div id="quoteDisplay">
+      <div class="quote-text">Click "Show New Quote" to get started!</div>
+      <div class="quote-category"></div>
+    </div>
+    
+    <!-- Control buttons and filter -->
+    <div class="controls">
+      <button id="newQuote">Show New Quote</button>
+      <select id="categoryFilter">
+        <option value="all">All Categories</option>
+      </select>
+      <button class="export-btn" onclick="exportToJsonFile()">Export Quotes</button>
+      <label for="importFile" class="file-label">Import Quotes</label>
+      <input type="file" id="importFile" accept=".json" />
+    </div>
+    
+    <!-- Add quote form -->
+    <div class="add-quote-form">
+      <h3 style="margin-bottom: 15px; color: #667eea;">Add New Quote</h3>
+      <div class="form-group">
+        <input id="newQuoteText" type="text" placeholder="Enter a new quote" />
+      </div>
+      <div class="form-group">
+        <input id="newQuoteCategory" type="text" placeholder="Enter quote category" />
+      </div>
+      <button onclick="addQuote()">Add Quote</button>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
