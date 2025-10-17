@@ -422,6 +422,8 @@ async function syncQuotes() {
       // Show notification for conflicts
       if (conflictsResolved > 0) {
         showNotification(`Conflicts resolved: Server data has been applied to ${conflictsResolved} quote(s)`);
+        showNotification('Quotes synced with server!');
+        console.log('Quotes synced with server!');
       }
     } else {
       showSyncStatus('Data is up to date', 'info');
